@@ -128,13 +128,15 @@ function VirtualKeyboard({ onChange }) {
       case 'period':
         handleCharacterInput('.');
         break;
-      case 'prev':
-        setSpecialPage((current) => Math.max(0, current - 1));
-        break;
-      case 'next':
-        setSpecialPage((current) =>
-          Math.min(specialPages.length - 1, current + 1),
-        );
+      case 'page':
+        setSpecialPage((current) => {
+          const totalPages = specialPages.length;
+          if (totalPages <= 1) {
+            return 0;
+          }
+
+          return (current + 1) % totalPages;
+        });
         break;
       default: {
         if (typeof key === 'string' && key.length > 0) {
@@ -156,8 +158,7 @@ function VirtualKeyboard({ onChange }) {
       abc: 'ABC',
       comma: ',',
       period: '.',
-      prev: '◀',
-      next: '▶',
+      page: `${specialPage + 1}/${specialPages.length}`,
     };
 
     if (baseLabels[key]) {
@@ -182,17 +183,12 @@ function VirtualKeyboard({ onChange }) {
       classes.push('key--action');
     }
 
-    if (key === 'special' || key === 'abc' || key === 'shift' || key === 'prev' || key === 'next') {
+    if (key === 'special' || key === 'abc' || key === 'shift' || key === 'page') {
       classes.push('key--modifier');
     }
 
     if (key === 'backspace') {
       classes.push('key--action');
-    }
-
-    if ((key === 'prev' && specialPage === 0) ||
-        (key === 'next' && specialPage === specialPages.length - 1)) {
-      classes.push('key--disabled');
     }
 
     if (key === 'shift' && isShiftActive) {
@@ -202,20 +198,16 @@ function VirtualKeyboard({ onChange }) {
     return classes.join(' ');
   };
 
-  const renderKey = (key) => (
-    <button
-      key={key}
-      type="button"
-      className={getKeyClassName(key)}
-      onClick={() => handleKeyPress(key)}
-      disabled={
-        (key === 'prev' && specialPage === 0) ||
-        (key === 'next' && specialPage === specialPages.length - 1)
-      }
-    >
-      {getKeyLabel(key)}
-    </button>
-  );
+    const renderKey = (key) => (
+      <button
+        key={key}
+        type="button"
+        className={getKeyClassName(key)}
+        onClick={() => handleKeyPress(key)}
+      >
+        {getKeyLabel(key)}
+      </button>
+    );
 
   const renderLetterRows = () =>
     LETTER_ROWS.map((row, index) => (
@@ -262,9 +254,8 @@ function VirtualKeyboard({ onChange }) {
         ))}
         <div className="keyboard-row">
           {renderKey('abc')}
-          {renderKey('prev')}
+          {renderKey('page')}
           {renderKey('space')}
-          {renderKey('next')}
           {renderKey('enter')}
         </div>
       </>
