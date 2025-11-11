@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import VirtualKeyboard from './VirtualKeyboard';
 import './App.css';
 
 function App() {
@@ -10,14 +11,15 @@ function App() {
       <label className="input-label" htmlFor="keyboard-input">
         Type something:
       </label>
-      <input
+      <textarea
         id="keyboard-input"
         className="keyboard-input"
-        type="text"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder="Start typing here..."
+        rows={3}
       />
+      <VirtualKeyboard onChange={setValue} />
       <p className="input-preview">
         {value ? `You typed: ${value}` : 'Your text will appear here.'}
       </p>
