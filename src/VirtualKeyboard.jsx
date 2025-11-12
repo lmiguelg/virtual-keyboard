@@ -52,9 +52,17 @@ const SPECIAL_CHARACTERS = [
   ']',
 ];
 
-const SPECIAL_CHARS_PER_ROW = 10;
-const SPECIAL_ROWS_PER_PAGE = 3;
-const SPECIAL_CHARS_PER_PAGE = SPECIAL_CHARS_PER_ROW * SPECIAL_ROWS_PER_PAGE;
+const SPECIAL_ROW_TEMPLATE = [
+  { charSlots: 10 },
+  { charSlots: 10 },
+  { charSlots: 10, trailingActions: ['backspace'] },
+  { leadingActions: ['abc'], trailingActions: ['page'] },
+];
+
+const SPECIAL_CHARS_PER_PAGE = SPECIAL_ROW_TEMPLATE.reduce(
+  (total, row) => total + (row.charSlots ?? 0),
+  0,
+);
 
 const chunk = (array, size) => {
   const result = [];
@@ -177,9 +185,9 @@ function VirtualKeyboard({ onChange }) {
     return classes.join(' ');
   };
 
-  const renderKey = (key) => (
+  const renderKey = (key, reactKey = key) => (
     <button
-      key={key}
+      key={reactKey}
       type="button"
       className={getKeyClassName(key)}
       onClick={() => handleKeyPress(key)}
@@ -189,54 +197,51 @@ function VirtualKeyboard({ onChange }) {
   );
 
   const renderLetterRows = () =>
-    LETTER_ROWS.map((row, index) => (
-      <div key={`letter-row-${index}`} className="keyboard-row">
-        {row.map((key) => {
-          if (key.length === 1) {
-            const display = isShiftActive ? key.toUpperCase() : key;
-            return (
-              <button
-                key={key}
-                type="button"
-                className="key"
-                onClick={() => handleKeyPress(key)}
-              >
-                {display}
-              </button>
-            );
-          }
-
-          return renderKey(key);
-        })}
+    LETTER_ROWS.map((row, rowIndex) => (
+      <div key={`letter-row-${rowIndex}`} className="keyboard-row">
+        {row.map((key, keyIndex) =>
+          renderKey(key, `letter-${rowIndex}-${keyIndex}-${key}`),
+        )}
       </div>
     ));
 
   const renderSpecialRows = () => {
-    const page = specialPages[specialPage] ?? [];
-    const pageRows = chunk(page, SPECIAL_CHARS_PER_ROW);
+    const pageCharacters = specialPages[specialPage] ?? [];
+    let characterIndex = 0;
 
-    while (pageRows.length < SPECIAL_ROWS_PER_PAGE) {
-      pageRows.push([]);
-    }
+    return SPECIAL_ROW_TEMPLATE.map((templateRow, rowIndex) => {
+      const keys = [];
 
-    if (pageRows.length > 0) {
-      const lastIndex = pageRows.length - 1;
-      pageRows[lastIndex] = [...pageRows[lastIndex], 'backspace'];
-    }
+      if (templateRow.leadingActions) {
+        keys.push(...templateRow.leadingActions);
+      }
 
-    return (
-      <>
-        {pageRows.map((row, index) => (
-          <div key={`special-row-${index}`} className="keyboard-row">
-            {row.map((key) => renderKey(key))}
-          </div>
-        ))}
-        <div className="keyboard-row">
-          {renderKey('abc')}
-          {renderKey('page')}
+      const slots = templateRow.charSlots ?? 0;
+      for (let slotIndex = 0; slotIndex < slots; slotIndex += 1) {
+        const character = pageCharacters[characterIndex];
+        characterIndex += 1;
+
+        if (character) {
+          keys.push(character);
+        }
+      }
+
+      if (templateRow.trailingActions) {
+        keys.push(...templateRow.trailingActions);
+      }
+
+      if (keys.length === 0) {
+        return null;
+      }
+
+      return (
+        <div key={`special-row-${rowIndex}`} className="keyboard-row">
+          {keys.map((key, keyIndex) =>
+            renderKey(key, `special-${rowIndex}-${keyIndex}-${key}`),
+          )}
         </div>
-      </>
-    );
+      );
+    }).filter(Boolean);
   };
 
   return (
