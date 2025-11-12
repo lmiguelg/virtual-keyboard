@@ -4,8 +4,7 @@ import './App.css';
 const LETTER_ROWS = [
   ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
   ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
-  ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'backspace'],
-  ['special', 'enter'],
+  ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'special', 'backspace'],
 ];
 
 const SPECIAL_CHARACTERS = [
@@ -107,9 +106,6 @@ function VirtualKeyboard({ onChange }) {
       case 'backspace':
         handleBackspace();
         break;
-      case 'enter':
-        handleCharacterInput('\n');
-        break;
       case 'special':
         setIsSpecialMode(true);
         setIsShiftActive(false);
@@ -143,7 +139,6 @@ function VirtualKeyboard({ onChange }) {
     const baseLabels = {
       shift: '⇧',
       backspace: '⌫',
-      enter: 'Enter',
       special: '?123',
       abc: 'ABC',
       page: `${specialPage + 1}/${specialPages.length}`,
@@ -162,10 +157,6 @@ function VirtualKeyboard({ onChange }) {
 
   const getKeyClassName = (key) => {
     const classes = ['key'];
-
-    if (key === 'enter') {
-      classes.push('key--action');
-    }
 
     if (key === 'special' || key === 'abc' || key === 'shift' || key === 'page') {
       classes.push('key--modifier');
@@ -239,7 +230,6 @@ function VirtualKeyboard({ onChange }) {
         <div className="keyboard-row">
           {renderKey('abc')}
           {renderKey('page')}
-          {renderKey('enter')}
         </div>
       </>
     );
