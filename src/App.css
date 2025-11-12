@@ -60,7 +60,7 @@ h1 {
 }
 
 .key {
-  flex: 1;
+  flex: 1 1 0;
   padding: 0.75rem 0.5rem;
   border: none;
   border-radius: 0.75rem;
@@ -79,18 +79,12 @@ h1 {
   box-shadow: 0 2px 6px -4px rgba(15, 23, 42, 0.6);
 }
 
-.key--space {
-  flex: 3;
-  text-transform: none;
-}
-
 .key--modifier {
-  flex: 1.2;
   text-transform: uppercase;
 }
 
 .key--action {
-  flex: 1.2;
+  flex: 2 1 0;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
   color: #ffffff;
   text-transform: uppercase;
