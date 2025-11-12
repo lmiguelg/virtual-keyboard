@@ -4,7 +4,7 @@ import './App.css';
 const LETTER_ROWS = [
   ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
   ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
-  ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'special', 'backspace'],
+  ['special', 'shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'backspace'],
 ];
 
 const SPECIAL_CHARACTERS = [
@@ -160,6 +160,10 @@ function VirtualKeyboard({ onChange }) {
 
     if (key === 'special' || key === 'abc' || key === 'shift' || key === 'page') {
       classes.push('key--modifier');
+    }
+
+    if (key === 'special') {
+      classes.push('key--special');
     }
 
     if (key === 'backspace') {

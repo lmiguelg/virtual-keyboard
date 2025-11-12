@@ -83,6 +83,10 @@ h1 {
   text-transform: uppercase;
 }
 
+.key--special {
+  flex: 2 1 0;
+}
+
 .key--action {
   flex: 2 1 0;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
