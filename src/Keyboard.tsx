@@ -29,11 +29,13 @@ const ActionsTypesSize = {
   [ActionsTypes.NextPage]: 2,
 } as const
 
-type TemplateStructure = {
+type TemplateRow = {
   charSlots?: number
   startActions?: ActionsTypes[]
   endActions?: ActionsTypes[]
-}[]
+}
+
+type TemplateStructure = TemplateRow[]
 
 const QWERTY_CHARS = 'qwertyuiopasdfghjklzxcvbnm'
 const NUMBER_CHARS = '1234567890'
@@ -149,72 +151,102 @@ const calcPages = (specialCharacters: string, size: number) => {
   return result
 }
 
-const handleCharsTemplate = (chars, pages, template: TemplateStructure) => {
-  const pageCharacters = pages[chars] ?? []
-  let characterIndex = 0
+const getNextPageAwareActions = (
+  actions: ActionsTypes[] = [],
+  hasMultiplePages: boolean,
+): ActionsTypes[] => {
+  if (hasMultiplePages) {
+    return actions
+  }
+  return actions.filter(action => action !== ActionsTypes.NextPage)
+}
 
-  const MAX_CHARS_PER_ROW = Math.max(
-    ...template.map(
-      ({ startActions = [], endActions = [], charSlots = 0 }) =>
-        charSlots +
-        [...startActions, ...endActions].reduce(
-          (sum, action) => sum + (ActionsTypesSize[action] || 0),
-          0,
-        ),
+const getMaxCharsPerRow = (template: TemplateStructure) => {
+  if (template.length === 0) {
+    return 0
+  }
+
+  return Math.max(
+    ...template.map(({ startActions = [], endActions = [], charSlots = 0 }) =>
+      charSlots +
+      [...startActions, ...endActions].reduce(
+        (sum, action) => sum + (ActionsTypesSize[action] || 0),
+        0,
+      ),
     ),
   )
+}
 
-  return template.map(templateRow => {
-    const keys: string[] = []
+const fillRow = (
+  row: TemplateRow,
+  state: {
+    characterIndex: number
+    pageCharacters: string
+    hasMultiplePages: boolean
+    maxCharsPerRow: number
+  },
+) => {
+  const keys: string[] = []
 
-    if (templateRow.startActions) {
-      let newStartAction = templateRow.startActions
+  const startActions = getNextPageAwareActions(
+    row.startActions,
+    state.hasMultiplePages,
+  )
+  keys.push(...startActions)
 
-      if (pages.length === 1) {
-        newStartAction = templateRow.startActions.filter(
-          item => item !== ActionsTypes.NextPage,
-        )
-      }
-      keys.push(...newStartAction)
+  const slots = row.charSlots ?? 0
+  for (let slotIndex = 0; slotIndex < slots; slotIndex += 1) {
+    const character = state.pageCharacters[state.characterIndex]
+    state.characterIndex += 1
+    if (character) {
+      keys.push(character)
     }
+  }
 
-    const slots = templateRow.charSlots ?? 0
-    for (let slotIndex = 0; slotIndex < slots; slotIndex += 1) {
-      const character = pageCharacters[characterIndex]
-      characterIndex += 1
-      if (character) {
-        keys.push(character)
-      }
-    }
+  const endActions = getNextPageAwareActions(
+    row.endActions,
+    state.hasMultiplePages,
+  )
+  keys.push(...endActions)
 
-    if (templateRow.endActions) {
-      let newEndAction = templateRow.endActions
-      if (pages.length === 1) {
-        newEndAction = templateRow.endActions.filter(
-          item => item !== ActionsTypes.NextPage,
-        )
-      }
-      keys.push(...newEndAction)
-    }
+  if (keys.length === 0) {
+    return null
+  }
 
-    if (keys.length === 0) {
-      return null
-    }
+  const currentRowSize = keys.reduce(
+    (sum, char) => sum + (ActionsTypesSize[char] || 1),
+    0,
+  )
 
-    const currentSizeRow = keys.reduce(
-      (sum, char) => sum + (ActionsTypesSize[char] || 1),
-      0,
+  if (currentRowSize < state.maxCharsPerRow) {
+    keys.push(
+      ...Array(state.maxCharsPerRow - currentRowSize).fill(
+        ActionsTypes.EmptyChar,
+      ),
     )
-    if (currentSizeRow < MAX_CHARS_PER_ROW) {
-      keys.push(
-        ...Array(MAX_CHARS_PER_ROW - currentSizeRow).fill(
-          ActionsTypes.EmptyChar,
-        ),
-      )
-    }
-    console.log(keys)
-    return keys
-  })
+  }
+
+  return keys
+}
+
+const buildKeyboardLayout = (
+  pageIndex: number,
+  pages: string[],
+  template: TemplateStructure,
+) => {
+  const pageCharacters = pages[pageIndex] ?? ''
+  const hasMultiplePages = pages.length > 1
+  const maxCharsPerRow = getMaxCharsPerRow(template)
+  const state = {
+    characterIndex: 0,
+    pageCharacters,
+    hasMultiplePages,
+    maxCharsPerRow,
+  }
+
+  return template
+    .map(row => fillRow(row, state))
+    .filter((row): row is string[] => Boolean(row))
 }
 
 type VirtualKeyboardProps = {
@@ -249,7 +281,6 @@ const VirtualKeyboard: FC<VirtualKeyboardProps> = ({
   type,
   specialCharacters = SPECIAL_CHARS,
 }) => {
-  console.log({ type })
   const theme = useTheme()
   const [specialCharsPagination, setSpecialCharsPagination] = useState(0)
   const keyboardConfig = getAvailableChars(type, specialCharacters)
@@ -292,65 +323,84 @@ const VirtualKeyboard: FC<VirtualKeyboardProps> = ({
   const { pathname } = useLocation()
   const isLoginPage = pathname === '/login'
 
+  const insertChar = (char: string, cursorPosition: number | null) => {
+    const finalChar = capsLockOn ? char.toUpperCase() : char.toLowerCase()
+    const newValue = inputRef.current?.value.split('') || []
+
+    newValue.splice(
+      cursorPosition === null ? newValue.length - 1 : cursorPosition,
+      0,
+      finalChar,
+    )
+
+    onKeyPress(newValue.join(''))
+  }
+
+  const removeChar = (cursorPosition: number | null) => {
+    if (cursorPosition === 0) {
+      return
+    }
+
+    const newValue = inputRef.current?.value.split('')
+    newValue?.splice(
+      cursorPosition === null ? newValue.length - 1 : cursorPosition - 1,
+      1,
+    )
+    onKeyPress(newValue?.join('') || '')
+  }
+
   const handleKeyPress = (char: string) => {
     const cursorPosition =
       typeof inputRef.current?.selectionStart === 'number'
         ? inputRef.current?.selectionStart
         : null
 
-    if (char === ActionsTypes.CapsLock) {
-      setCapsLockOn(!capsLockOn)
-    } else if (char === ActionsTypes.NextPage) {
-      if (specialCharsPagination + 1 === numberPages) {
-        setSpecialCharsPagination(0)
-        return
+    switch (char) {
+      case ActionsTypes.CapsLock:
+        setCapsLockOn(!capsLockOn)
+        break
+      case ActionsTypes.NextPage: {
+        const isLastPage = specialCharsPagination + 1 === numberPages
+        setSpecialCharsPagination(isLastPage ? 0 : specialCharsPagination + 1)
+        break
       }
-      setSpecialCharsPagination(specialCharsPagination + 1)
-    } else if (char === numericSpecialChar || char === ActionsTypes.Alpha) {
-      setNumericSpecial(!numericSpecial)
-      setSpecialCharsPagination(0)
-    } else if (char === ActionsTypes.Backspace) {
-      if (cursorPosition !== 0) {
-        const newValue = inputRef.current?.value.split('')
-        // removes the character in the position of the cursor
-        newValue?.splice(
-          cursorPosition === null ? newValue.length - 1 : cursorPosition - 1,
-          1,
-        )
-        onKeyPress(newValue?.join('') || '')
-      }
-    } else {
-      const finalChar = capsLockOn ? char.toUpperCase() : char.toLowerCase()
-      const newValue = inputRef.current?.value.split('') || []
+      case ActionsTypes.Backspace:
+        removeChar(cursorPosition)
+        break
+      default: {
+        const shouldToggleLayout =
+          char === numericSpecialChar || char === ActionsTypes.Alpha
 
-      // adds the character in the position of the cursor
-      newValue.splice(
-        cursorPosition === null ? newValue.length - 1 : cursorPosition,
-        0,
-        finalChar,
-      )
-      onKeyPress(newValue.join(''))
+        if (shouldToggleLayout) {
+          setNumericSpecial(!numericSpecial)
+          setSpecialCharsPagination(0)
+          break
+        }
+
+        insertChar(char, cursorPosition)
+      }
     }
   }
 
   const wrapChar = (char: string) => {
-    if (char === ActionsTypes.Backspace) {
-      return <Icon name="OutlineKeyboardBackspace" width={24} />
+    switch (char) {
+      case ActionsTypes.Backspace:
+        return <Icon name="OutlineKeyboardBackspace" width={24} />
+      case ActionsTypes.CapsLock:
+        return <Icon name={capsLockOn ? 'Uppercase' : 'Lowercase'} width={24} />
+      case ActionsTypes.NextPage:
+        return `${specialCharsPagination + 1}/${numberPages}`
+      default:
+        if (char === numericSpecialChar || char === ActionsTypes.Alpha) {
+          return char
+        }
+
+        if (capsLockOn && char.match(/[a-z]/)) {
+          return char.toUpperCase()
+        }
+
+        return char
     }
-    if (char === ActionsTypes.CapsLock) {
-      return <Icon name={capsLockOn ? 'Uppercase' : 'Lowercase'} width={24} />
-    }
-    if (char === numericSpecialChar || char === ActionsTypes.Alpha) {
-      return char
-    }
-    if (char === ActionsTypes.NextPage) {
-      return `${specialCharsPagination + 1}/${numberPages}`
-    }
-    // prevent upperCase specialCharacters like Á à ñ Ñ, etc
-    if (capsLockOn && char.match(/[a-z]/)) {
-      return char.toUpperCase()
-    }
-    return char
   }
 
   const handleCalcSize = (
@@ -369,46 +419,32 @@ const VirtualKeyboard: FC<VirtualKeyboardProps> = ({
   const handleActionSize = (char: string) => {
     const defaultViewWidth = 40
     const defaultViewMinWidth = 20
-    if (char === ActionsTypes.CapsLock)
+    const actionsWithCustomSize: ActionsTypes[] = [
+      ActionsTypes.CapsLock,
+      ActionsTypes.NextPage,
+      ActionsTypes.Backspace,
+      ActionsTypes.AlphaNumericSpecial,
+      ActionsTypes.Alpha,
+    ]
+
+    if (actionsWithCustomSize.includes(char as ActionsTypes)) {
       return handleCalcSize(
-        ActionsTypes.CapsLock,
+        char as ActionsTypes,
         defaultViewWidth,
         defaultViewMinWidth,
       )
-    if (char === ActionsTypes.NextPage)
-      return handleCalcSize(
-        ActionsTypes.NextPage,
-        defaultViewWidth,
-        defaultViewMinWidth,
-      )
-    if (char === ActionsTypes.Backspace)
-      return handleCalcSize(
-        ActionsTypes.Backspace,
-        defaultViewWidth,
-        defaultViewMinWidth,
-      )
-    if (char === ActionsTypes.AlphaNumericSpecial)
-      return handleCalcSize(
-        ActionsTypes.AlphaNumericSpecial,
-        defaultViewWidth,
-        defaultViewMinWidth,
-      )
-    if (char === ActionsTypes.Alpha)
-      return handleCalcSize(
-        ActionsTypes.Alpha,
-        defaultViewWidth,
-        defaultViewMinWidth,
-      )
+    }
+
     return {
       maxWidth: `${defaultViewWidth}px`,
       minWidth: `${defaultViewMinWidth}px`,
     }
   }
 
-  const charsTemplate = handleCharsTemplate(
+  const charsTemplate = buildKeyboardLayout(
     specialCharsPagination,
     keyboardStructure,
-    structure?.template,
+    structure?.template ?? [],
   )
 
   return (
